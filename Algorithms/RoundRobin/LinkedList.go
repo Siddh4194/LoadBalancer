@@ -89,18 +89,26 @@ func (lb *LoadBalancer) GetNextServer() (*httputil.ReverseProxy, error) {
 
 	if lb.current == nil {
 		lb.current = lb.Servers.head
-		return &lb.current.Proxy, nil
+	} else {
+		lb.current = lb.current.Next
 	}
 
-	for !lb.current.Healthy {
+	start := lb.current
+
+	for  {
+		if lb.current.Healthy {
+			fmt.Printf("Selected server: %s (Healthy: %t)\n", lb.current.Server, lb.current.Healthy)
+			return &lb.current.Proxy, nil
+		}
+
 		lb.current = lb.current.Next
-		if lb.current == lb.Servers.head {
-			return nil, fmt.Errorf("No healthy servers available")
+
+		if lb.current == start {
+			break;
 		}
 	}
 
-	lb.current = lb.current.Next
-	return &lb.current.Proxy, nil
+	return nil, fmt.Errorf("Couldn't found healthy servers")
 }
 
 

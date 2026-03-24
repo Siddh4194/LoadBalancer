@@ -12,9 +12,10 @@ func HealthCheck(node *roundrobin.Node) {
 		Timeout: 2 * time.Second,
 	}
 	resp, err := client.Get(node.Url + "/health")
-	fmt.Printf("Health check for server %s: %d", node.Server,resp.StatusCode)
+	fmt.Printf("Health check for server %s: ", node.Server)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		node.FailCount++
+		fmt.Printf("FAILED %d (Healthy: %t)\n", node.FailCount, node.Healthy)
 	} else {
 		node.FailCount = 0
 		node.Healthy = true

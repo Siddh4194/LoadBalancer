@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 )
 
 
@@ -69,10 +70,17 @@ func main() {
 	ipHashing := false
 	roundRobin := true
 	lb := initiateRoundRobin()
+	
+	go func(){
+		ticker := time.NewTicker(4 * time.Second)
 
-	lb.ForEachServer(func(server *roundrobin.Node) {
-		go lib.HealthCheck(server)
-	})
+		for range ticker.C {
+			lb.ForEachServer(func(server *roundrobin.Node) {
+				go lib.HealthCheck(server)
+			})
+		}
+	}()
+
 
 	proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
 	fmt.Println(proxy)
