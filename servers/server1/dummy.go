@@ -13,6 +13,10 @@ func main() {
 		fmt.Fprintf(w, "Hello, World from server 1!")
 	})
 
+	
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"status": "healthy"}`)
+	})
 
 	// 2. Start the HTTP server
 	port := ":3000"

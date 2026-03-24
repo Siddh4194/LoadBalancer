@@ -2,6 +2,7 @@ package main
 
 import (
 	roundrobin "LoadBalancer/Algorithms/RoundRobin"
+	"LoadBalancer/lib"
 	"fmt"
 	"hash/fnv"
 	"log"
@@ -49,11 +50,12 @@ func parseUrl(urlStr string) *url.URL {
 
 func initiateRoundRobin() *roundrobin.LoadBalancer {
 	cll := &roundrobin.CircularLinkedList{}
-	cll.Add("1", *parseUrl("http://localhost:3000"))
-	cll.Add("2", *parseUrl("http://localhost:3001"))
-	cll.Add("3", *parseUrl("http://localhost:3002"))
+	cll.Add("1", *parseUrl("http://localhost:3000"),"http://localhost:3000")
+	cll.Add("2", *parseUrl("http://localhost:3001"),"http://localhost:3001")
+	cll.Add("3", *parseUrl("http://localhost:3002"),"http://localhost:3002")
 
 	lb := &roundrobin.LoadBalancer{Servers: cll}
+
 	return lb;
 }
 
@@ -67,6 +69,10 @@ func main() {
 	ipHashing := false
 	roundRobin := true
 	lb := initiateRoundRobin()
+
+	lb.ForEachServer(func(server *roundrobin.Node) {
+		go lib.HealthCheck(server)
+	})
 
 	proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
 	fmt.Println(proxy)
@@ -83,10 +89,7 @@ func main() {
 				http.Error(w, "No servers available", http.StatusServiceUnavailable)
 				return
 			}
-			fmt.Printf("Selected server: %s\n", server.Host)
-			proxy := httputil.NewSingleHostReverseProxy(server)
-			proxy.ServeHTTP(w,r)
-
+			server.ServeHTTP(w,r)
 		}
 		// fmt.Fprintf(w, "Hello, World from load balancer!")
 	})

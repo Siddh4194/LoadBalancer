@@ -2,13 +2,19 @@ package roundrobin
 
 import (
 	"fmt"
+	"net/http/httputil"
 	"net/url"
+	"sync"
 )
 
 type Node struct {
-	server   string
-	proxyUrl url.URL
-	next     *Node
+	Server   string
+	ProxyUrl url.URL
+	Url string
+	Proxy httputil.ReverseProxy
+	Next     *Node
+	FailCount int
+	Healthy bool
 }
 
 type CircularLinkedList struct {
@@ -16,17 +22,17 @@ type CircularLinkedList struct {
 	tail *Node
 }
 
-func (cll *CircularLinkedList) Add(server string,proxyUrl url.URL) {
-	newNode := &Node{server: server, proxyUrl: proxyUrl}
+func (cll *CircularLinkedList) Add(server string,proxyUrl url.URL,url string) {
+	newNode := &Node{Server: server, ProxyUrl: proxyUrl, Url: url,Proxy: *httputil.NewSingleHostReverseProxy(&proxyUrl),FailCount: 0, Healthy:  true}
 
 	if cll.head == nil {
 		cll.head = newNode
 		cll.tail = newNode
-		newNode.next = cll.head
+		newNode.Next = cll.head
 		return
 	}
-	cll.tail.next = newNode
-	newNode.next = cll.head
+	cll.tail.Next = newNode
+	newNode.Next = cll.head
 	cll.tail = newNode
 }
 
@@ -39,7 +45,7 @@ func (cll *CircularLinkedList) Remove(server string) {
 	curr := cll.head
 
 	for {
-		if curr.server == server {
+		if curr.Server == server {
 
 			if curr == cll.head && curr == cll.tail {
 				cll.head = nil
@@ -48,20 +54,20 @@ func (cll *CircularLinkedList) Remove(server string) {
 			}
 
 			if curr == cll.head {
-				cll.head = curr.next
-				cll.tail.next = cll.head
+				cll.head = curr.Next
+				cll.tail.Next = cll.head
 			}
 
 			if curr == cll.tail {
 				cll.tail = prev
-				cll.tail.next = cll.head
+				cll.tail.Next = cll.head
 			}
 
 			return
 		}
 
 		prev = curr
-		curr = curr.next
+		curr = curr.Next
 
 		if curr == cll.head {
 			break
@@ -73,18 +79,47 @@ func (cll *CircularLinkedList) Remove(server string) {
 type LoadBalancer struct {
 	Servers *CircularLinkedList
 	current *Node
+	mu sync.RWMutex
 }
 
-func (lb *LoadBalancer) GetNextServer() (*url.URL, error) {
+func (lb *LoadBalancer) GetNextServer() (*httputil.ReverseProxy, error) {
 	if lb.Servers.head == nil {
 		return nil, fmt.Errorf("No servers available")
 	}
 
 	if lb.current == nil {
 		lb.current = lb.Servers.head
-		return &lb.current.proxyUrl, nil
+		return &lb.current.Proxy, nil
 	}
 
-	lb.current = lb.current.next
-	return &lb.current.proxyUrl,nil
+	for !lb.current.Healthy {
+		lb.current = lb.current.Next
+		if lb.current == lb.Servers.head {
+			return nil, fmt.Errorf("No healthy servers available")
+		}
+	}
+
+	lb.current = lb.current.Next
+	return &lb.current.Proxy, nil
+}
+
+
+func (lb * LoadBalancer) ForEachServer(fn func(server *Node)){
+	lb.mu.RLock()
+	defer lb.mu.RUnlock()
+
+	current := lb.Servers.head
+
+	if current == nil {
+		return
+	}
+
+	for {
+		fn(current)
+		current = current.Next
+
+		if current == lb.Servers.head {
+			break;
+		}
+	}
 }
