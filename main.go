@@ -3,6 +3,8 @@ package main
 import (
 	roundrobin "LoadBalancer/Algorithms/RoundRobin"
 	"LoadBalancer/lib"
+	"LoadBalancer/logger"
+	"LoadBalancer/middleware"
 	"fmt"
 	"hash/fnv"
 	"log"
@@ -66,6 +68,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	logger.InitLogger()
+	defer logger.Log.Sync()
+	logger.Log.Info("Load balancer started")
+
 	// ip hashing
 	ipHashing := false
 	roundRobin := true
@@ -105,7 +111,7 @@ func main() {
 
 	port := ":8080"
 	log.Printf("Starting server on port %s", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
+	if err := http.ListenAndServe(port,  middleware.LoggingMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatal(err)
 	}
 }
