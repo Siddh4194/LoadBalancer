@@ -14,15 +14,14 @@ import (
 	"time"
 )
 
-
 func roundRobinAlGoToSelectServer(server int) *httputil.ReverseProxy {
 	server1, err1 := url.Parse("http://localhost:3000")
 	server2, err2 := url.Parse("http://localhost:3001")
 	server3, err3 := url.Parse("http://localhost:3002")
 
-	if err1 != nil ||  err2 != nil || err3 != nil {
+	if err1 != nil || err2 != nil || err3 != nil {
 		log.Fatal("Error parsing server URLs")
-	} 
+	}
 	var selectedServer *url.URL
 
 	if server == 1 {
@@ -39,7 +38,7 @@ func roundRobinAlGoToSelectServer(server int) *httputil.ReverseProxy {
 
 func hashIP(ip string) uint32 {
 	h := fnv.New32a()
-	h.Write([]byte(ip))      // get hash
+	h.Write([]byte(ip)) // get hash
 	return h.Sum32()
 }
 
@@ -53,13 +52,13 @@ func parseUrl(urlStr string) *url.URL {
 
 func initiateRoundRobin() *roundrobin.LoadBalancer {
 	cll := &roundrobin.CircularLinkedList{}
-	cll.Add("1", *parseUrl("http://localhost:3000"),"http://localhost:3000")
-	cll.Add("2", *parseUrl("http://localhost:3001"),"http://localhost:3001")
-	cll.Add("3", *parseUrl("http://localhost:3002"),"http://localhost:3002")
+	cll.Add("1", *parseUrl("http://localhost:3000"), "http://localhost:3000")
+	cll.Add("2", *parseUrl("http://localhost:3001"), "http://localhost:3001")
+	cll.Add("3", *parseUrl("http://localhost:3002"), "http://localhost:3002")
 
 	lb := &roundrobin.LoadBalancer{Servers: cll}
 
-	return lb;
+	return lb
 }
 
 func main() {
@@ -76,8 +75,8 @@ func main() {
 	ipHashing := false
 	roundRobin := true
 	lb := initiateRoundRobin()
-	
-	go func(){
+
+	go func() {
 		ticker := time.NewTicker(4 * time.Second)
 
 		for range ticker.C {
@@ -87,31 +86,29 @@ func main() {
 		}
 	}()
 
-
 	proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
 	fmt.Println(proxy)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Print(r.URL.Path)
-		if(ipHashing){
+		if ipHashing {
 			hashedIp := hashIP(r.RemoteAddr)
-			fmt.Printf("Hashed IP: %d\n", hashedIp % 3)
-			roundRobinAlGoToSelectServer(int(hashedIp % 3)).ServeHTTP(w, r)
+			fmt.Printf("Hashed IP: %d\n", hashedIp%3)
+			roundRobinAlGoToSelectServer(int(hashedIp%3)).ServeHTTP(w, r)
 		}
-		if(roundRobin){
-			server,err := lb.GetNextServer()
+		if roundRobin {
+			server, err := lb.GetNextServer()
 			if err != nil {
 				http.Error(w, "No servers available", http.StatusServiceUnavailable)
 				return
 			}
-			server.ServeHTTP(w,r)
+			server.ServeHTTP(w, r)
 		}
 		// fmt.Fprintf(w, "Hello, World from load balancer!")
 	})
 
-
 	port := ":8080"
 	log.Printf("Starting server on port %s", port)
-	if err := http.ListenAndServe(port,  middleware.LoggingMiddleware(http.DefaultServeMux)); err != nil {
+	if err := http.ListenAndServe(port, middleware.LoggingMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatal(err)
 	}
 }

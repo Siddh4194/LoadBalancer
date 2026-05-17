@@ -8,13 +8,13 @@ import (
 )
 
 type Node struct {
-	Server   string
-	ProxyUrl url.URL
-	Url string
-	Proxy httputil.ReverseProxy
-	Next     *Node
+	Server    string
+	ProxyUrl  url.URL
+	Url       string
+	Proxy     httputil.ReverseProxy
+	Next      *Node
 	FailCount int
-	Healthy bool
+	Healthy   bool
 }
 
 type CircularLinkedList struct {
@@ -22,8 +22,8 @@ type CircularLinkedList struct {
 	tail *Node
 }
 
-func (cll *CircularLinkedList) Add(server string,proxyUrl url.URL,url string) {
-	newNode := &Node{Server: server, ProxyUrl: proxyUrl, Url: url,Proxy: *httputil.NewSingleHostReverseProxy(&proxyUrl),FailCount: 0, Healthy:  true}
+func (cll *CircularLinkedList) Add(server string, proxyUrl url.URL, url string) {
+	newNode := &Node{Server: server, ProxyUrl: proxyUrl, Url: url, Proxy: *httputil.NewSingleHostReverseProxy(&proxyUrl), FailCount: 0, Healthy: true}
 
 	if cll.head == nil {
 		cll.head = newNode
@@ -79,7 +79,7 @@ func (cll *CircularLinkedList) Remove(server string) {
 type LoadBalancer struct {
 	Servers *CircularLinkedList
 	current *Node
-	mu sync.RWMutex
+	mu      sync.RWMutex
 }
 
 func (lb *LoadBalancer) GetNextServer() (*httputil.ReverseProxy, error) {
@@ -95,7 +95,7 @@ func (lb *LoadBalancer) GetNextServer() (*httputil.ReverseProxy, error) {
 
 	start := lb.current
 
-	for  {
+	for {
 		if lb.current.Healthy {
 			fmt.Printf("Selected server: %s (Healthy: %t)\n", lb.current.Server, lb.current.Healthy)
 			return &lb.current.Proxy, nil
@@ -104,15 +104,14 @@ func (lb *LoadBalancer) GetNextServer() (*httputil.ReverseProxy, error) {
 		lb.current = lb.current.Next
 
 		if lb.current == start {
-			break;
+			break
 		}
 	}
 
 	return nil, fmt.Errorf("Couldn't found healthy servers")
 }
 
-
-func (lb * LoadBalancer) ForEachServer(fn func(server *Node)){
+func (lb *LoadBalancer) ForEachServer(fn func(server *Node)) {
 	lb.mu.RLock()
 	defer lb.mu.RUnlock()
 
@@ -127,7 +126,7 @@ func (lb * LoadBalancer) ForEachServer(fn func(server *Node)){
 		current = current.Next
 
 		if current == lb.Servers.head {
-			break;
+			break
 		}
 	}
 }

@@ -17,7 +17,6 @@ func main() {
 		fmt.Fprintf(w, `{"status": "healthy"}`)
 	})
 
-
 	// 2. Start the HTTP server
 	port := ":3002"
 	log.Printf("Starting server on port %s", port)
